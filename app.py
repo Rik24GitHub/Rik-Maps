@@ -1,6 +1,6 @@
 """
 Kolkata & Howrah Rental Finder (PG / Flats)
-Idea & Development: see DEVELOPER_NAME below.
+Idea, development and design: Rik Karmakar.
 
 Data sources (all free / open):
   - OpenStreetMap Nominatim  -> place search (geocoding)
@@ -19,9 +19,9 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 # ----------------------------------------------------------------------------
-# CHANGE THIS to your name
+# Creator credit
 # ----------------------------------------------------------------------------
-DEVELOPER_NAME = "Your Name"
+DEVELOPER_NAME = "Rik Karmakar"
 
 # Kolkata + Howrah bounding box (south, west, north, east)
 BBOX = (22.40, 88.20, 22.75, 88.50)
@@ -40,6 +40,45 @@ st.set_page_config(
     page_icon="🏠",
     layout="wide",
 )
+
+CSS = """
+<style>
+.block-container {padding-top: 1.2rem; max-width: 1300px;}
+.hero {
+    background: linear-gradient(120deg, #0f2027 0%, #203a43 45%, #2c7a7b 100%);
+    border-radius: 18px; padding: 28px 32px; color: #fff; margin-bottom: 18px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
+.hero h1 {margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: .3px; color:#fff;}
+.hero p {margin: 6px 0 0 0; font-size: 1.02rem; opacity: .92;}
+.hero .credit {
+    display: inline-block; margin-top: 14px; padding: 6px 14px; border-radius: 999px;
+    background: rgba(255,255,255,.15); font-size: .9rem; backdrop-filter: blur(4px);
+}
+.chips span {
+    display:inline-block; margin: 10px 8px 0 0; padding: 4px 12px; border-radius: 999px;
+    background: rgba(255,255,255,.18); font-size: .82rem;
+}
+.metric-card {
+    background: #ffffff; border-radius: 14px; padding: 14px 18px; text-align: center;
+    border: 1px solid #e6ecef; box-shadow: 0 2px 10px rgba(0,0,0,.05);
+}
+.metric-card .num {font-size: 1.8rem; font-weight: 800; color: #1f6f78;}
+.metric-card .lbl {font-size: .85rem; color: #5b6b73;}
+.legend {
+    display:flex; flex-wrap:wrap; gap:10px; margin: 8px 0 14px 0; font-size:.85rem;
+}
+.legend span {background:#f3f7f8; border:1px solid #e1e9ec; border-radius:999px; padding:4px 12px; color:#33444c;}
+.footer {
+    text-align:center; margin-top: 28px; padding: 16px; border-radius: 14px;
+    background: linear-gradient(120deg, #0f2027, #2c7a7b); color: #fff; font-size: .95rem;
+}
+.footer b {letter-spacing:.3px;}
+section[data-testid="stSidebar"] {background: #f4f8f9;}
+div[data-testid="stTabs"] button {font-weight: 600;}
+</style>
+"""
+st.markdown(CSS, unsafe_allow_html=True)
 
 
 # ----------------------------------------------------------------------------
@@ -263,10 +302,16 @@ def search_links(place, kind_word, months):
 # ----------------------------------------------------------------------------
 # UI
 # ----------------------------------------------------------------------------
-st.title("🏠 Kolkata & Howrah Rental Finder")
-st.caption(
-    f"Find nearby PGs, hostels and flats with metro stations and gate numbers  |  "
-    f"Idea & Developed by **{esc(DEVELOPER_NAME)}**"
+st.markdown(
+    f"""
+    <div class="hero">
+      <h1>🏠 Kolkata &amp; Howrah Rental Finder</h1>
+      <p>Find nearby PGs, hostels and flats for 3, 6 or 12 months, with metro stations and gate numbers on the map.</p>
+      <div class="chips"><span>🗺️ Live OpenStreetMap data</span><span>🚇 Metro stations &amp; gates</span><span>🏘️ PG &amp; Flats</span></div>
+      <div class="credit">✨ Idea, development &amp; design by <b>{esc(DEVELOPER_NAME)}</b></div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 with st.sidebar:
@@ -355,8 +400,25 @@ if st.session_state.get("state") == "run" and st.session_state.get("chosen"):
         s["Metro Dist (m)"] = st_dist if st_dist is not None else "-"
     stays.sort(key=lambda x: x["Distance (m)"])
 
+    # ---- Summary cards ----
+    n_pg = sum(1 for x in stays if x["Type"] == "PG / Hostel")
+    n_fl = sum(1 for x in stays if x["Type"] == "Flat / Apartment")
+    cards = [
+        (len(stays), "Places found"),
+        (n_pg, "PG / Hostels"),
+        (n_fl, "Flats / Apartments"),
+        (len(stations), "Metro stations"),
+        (len(gates), "Metro gates"),
+    ]
+    for col, (num, lbl) in zip(st.columns(5), cards):
+        col.markdown(
+            f'<div class="metric-card"><div class="num">{num}</div><div class="lbl">{lbl}</div></div>',
+            unsafe_allow_html=True,
+        )
+    st.write("")
+
     # ---- Map ----
-    m = folium.Map(location=[lat, lon], zoom_start=15, tiles="OpenStreetMap", control_scale=True)
+    m = folium.Map(location=[lat, lon], zoom_start=15, tiles="CartoDB positron", control_scale=True)
     s_, w_, n_, e_ = BBOX
     folium.Rectangle(
         bounds=[[s_, w_], [n_, e_]], color="#888", weight=1, fill=False, dash_array="6"
@@ -406,8 +468,11 @@ if st.session_state.get("state") == "run" and st.session_state.get("chosen"):
         ).add_to(m)
 
     st_folium(m, height=560, use_container_width=True, returned_objects=[])
-    st.caption(
-        "Legend: 🟢 searched place | 🔵 PG/Hostel | 🟣 Flat/Apartment | 🔴 Metro station | 🟠 numbered circle = metro gate"
+    st.markdown(
+        '<div class="legend"><span>🟢 Searched place</span><span>🔵 PG / Hostel</span>'
+        '<span>🟣 Flat / Apartment</span><span>🔴 Metro station</span>'
+        '<span>🟠 Numbered circle = metro gate</span></div>',
+        unsafe_allow_html=True,
     )
 
     tab1, tab2, tab3, tab4 = st.tabs(["🏘️ PGs & Flats", "🚇 Metro stations", "🚪 Metro gates", "🔗 Live listings"])
@@ -453,13 +518,18 @@ if st.session_state.get("state") == "run" and st.session_state.get("chosen"):
                 col.link_button(label, url)
 
 else:
-    m = folium.Map(location=list(DEFAULT_CENTER), zoom_start=12, tiles="OpenStreetMap")
+    m = folium.Map(location=list(DEFAULT_CENTER), zoom_start=12, tiles="CartoDB positron")
     s_, w_, n_, e_ = BBOX
     folium.Rectangle(bounds=[[s_, w_], [n_, e_]], color="#888", weight=1, fill=False, dash_array="6").add_to(m)
     st_folium(m, height=520, use_container_width=True, returned_objects=[])
     st.info("👈 Enter a location in the sidebar and press Search.")
 
-st.markdown("---")
-st.caption(
-    f"Idea & Development: **{esc(DEVELOPER_NAME)}** · Map data © OpenStreetMap contributors"
+st.markdown(
+    f"""
+    <div class="footer">
+      Original idea, design &amp; development by <b>{esc(DEVELOPER_NAME)}</b><br>
+      <small>Map data © OpenStreetMap contributors</small>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
